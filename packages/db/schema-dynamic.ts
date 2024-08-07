@@ -26,6 +26,9 @@ function pluralizeCommonObjectName(name: string) {
     case 'crm_contact':
     case 'crm_lead':
     case 'crm_user':
+    case 'crm_email':
+    case 'crm_note':
+    case 'crm_call':
     case 'engagement_account':
     case 'engagement_contact':
     case 'engagement_sequence_state':

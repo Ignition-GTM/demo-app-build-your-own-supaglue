@@ -465,7 +465,16 @@ export async function triggerImmediateSync({
   const data = {
     ...event.data,
     vertical: 'crm',
-    unified_objects: ['account', 'contact', 'opportunity', 'lead', 'user'],
+    unified_objects: [
+      'account',
+      'contact',
+      'opportunity',
+      'lead',
+      'user',
+      'call',
+      'email',
+      'note',
+    ],
     // TODO: Dedupe with this scheduleSyncs
     destination_schema: env.DESTINATION_SCHEMA,
   } satisfies Events['sync.requested']['data']

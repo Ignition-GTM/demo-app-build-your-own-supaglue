@@ -142,6 +142,54 @@ export const user = zBaseRecord
   })
   .openapi({ref: 'crm.user'})
 
+export const email = zBaseRecord
+  .extend({
+    from_email: z.string().nullish(),
+    to_email: z.string().nullish(),
+    subject: z.string().nullish(),
+    text: z.string().nullish(),
+    // Add more fields once we unify more providers
+    // html: z.string().nullish(),
+    // status: z.string().nullish(),
+    // from_first_name: z.string().nullish(),
+    // from_last_name: z.string().nullish(),
+    // to_first_name: z.string().nullish(),
+    // to_last_name: z.string().nullish(),
+    // last_activity_at: z.string().nullish(),
+    // created_at: z.string().nullish(),
+    // is_deleted: z.boolean().nullish(),
+    // last_modified_at: z.string().nullish(),
+  })
+  .openapi({ref: 'crm.email'})
+
+export const call = zBaseRecord
+  .extend({
+    // Add more fields once we unify more providers
+    // body: z.string().nullish(),
+    // direction: z.string().nullish(),
+    // duration: z.string().nullish(),
+    // status: z.string().nullish(),
+    // name: z.string().nullish(),
+    // from_number: z.string().nullish(),
+    // source: z.string().nullish(),
+    // recording_url: z.string().nullish(),
+    // disposition: z.string().nullish(),
+    // created_at: z.string().nullish(),
+    // is_deleted: z.boolean().nullish(),
+    // last_modified_at: z.string().nullish(),
+  })
+  .openapi({ref: 'crm.call'})
+
+export const note = zBaseRecord
+  .extend({
+    // Add more fields once we unify more providers
+    body: z.string().nullish(),
+    // attachment_ids: z.string().nullish(),
+    // created_at: z.string().nullish(),
+    // last_modified_at: z.string().nullish(),
+  })
+  .openapi({ref: 'crm.note'})
+
 // MARK: - Meta
 
 export const meta_object = z
