@@ -230,7 +230,7 @@ export function listFields<T extends keyof typeof propertiesForCommonObject>(
 
   if (
     objectType === 'opportunity' &&
-    ['63aca2d6213def0014837f98', '6580d11eda0dd92961348262, 65f9d54592502ce4aaaf1997'].includes(
+    ['63aca2d6213def0014837f98', '6580d11eda0dd92961348262', '65f9d54592502ce4aaaf1997'].includes(
       ctx.customerId,
     )
   ) {
@@ -252,6 +252,14 @@ export function listFields<T extends keyof typeof propertiesForCommonObject>(
         ].includes(f),
     ) as typeof fields
   }
+
+  if (
+    objectType === 'contact' &&
+    ['65f9d54592502ce4aaaf1997'].includes(ctx.customerId)
+  ) {
+    return fields.filter((f) => f !== 'Fax') as typeof fields
+  }
+
   return fields
 }
 
