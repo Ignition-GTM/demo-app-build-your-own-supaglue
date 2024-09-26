@@ -43,7 +43,7 @@ export async function scheduleSyncs({
   const byos = initByosSDK({
     headers: {
       'x-api-key': env.SUPAGLUE_API_KEY,
-      'x-nango-secret-key': env.NANGO_SECRET_KEY,
+      'x-nango-secret-key': '765784d4-41ba-44e6-aa0e-170c892db162',
     },
     // Bypass the normal fetch link http round-tripping back to our server and handle the BYOS request directly!
     // Though we are losing the ability to debug using Proxyman and others... So maybe make this configurable in
@@ -178,7 +178,7 @@ export async function syncConnection({
   const byos = initByosSDK({
     headers: {
       'x-api-key': env.SUPAGLUE_API_KEY,
-      'x-nango-secret-key': env.NANGO_SECRET_KEY,
+      'x-nango-secret-key': '765784d4-41ba-44e6-aa0e-170c892db162',
       'x-customer-id': customer_id, // This relies on customer-id mapping 1:1 to connection_id
       'x-provider-name': provider_name, // This relies on provider_config_key mapping 1:1 to provider-name
     },
@@ -474,6 +474,7 @@ export async function triggerImmediateSync({
       'call',
       'email',
       'note',
+      'meeting',
     ],
     // TODO: Dedupe with this scheduleSyncs
     destination_schema: env.DESTINATION_SCHEMA,

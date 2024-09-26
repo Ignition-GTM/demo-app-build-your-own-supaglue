@@ -132,6 +132,9 @@ export interface paths {
   '/crm/v2/note': {
     get: operations['crm-listNotes']
   }
+  '/crm/v2/meeting': {
+    get: operations['crm-listMeetings']
+  }
 }
 
 export interface webhooks {
@@ -771,6 +774,15 @@ export interface components {
       }
     }
     'crm.note': {
+      id: string
+      /** @description ISO8601 date string */
+      updated_at: string
+      raw_data?: {
+        [key: string]: unknown
+      }
+      body?: string | null
+    }
+    'crm.meeting': {
       id: string
       /** @description ISO8601 date string */
       updated_at: string
@@ -2528,6 +2540,45 @@ export interface operations {
             next_cursor?: string | null
             has_next_page: boolean
             items: components['schemas']['crm.note'][]
+          }
+        }
+      }
+      /** @description Invalid input data */
+      400: {
+        content: {
+          'application/json': components['schemas']['error.BAD_REQUEST']
+        }
+      }
+      /** @description Not found */
+      404: {
+        content: {
+          'application/json': components['schemas']['error.NOT_FOUND']
+        }
+      }
+      /** @description Internal server error */
+      500: {
+        content: {
+          'application/json': components['schemas']['error.INTERNAL_SERVER_ERROR']
+        }
+      }
+    }
+  }
+  'crm-listMeetings': {
+    parameters: {
+      query?: {
+        sync_mode?: 'full' | 'incremental'
+        cursor?: string | null
+        page_size?: number
+      }
+    }
+    responses: {
+      /** @description Successful response */
+      200: {
+        content: {
+          'application/json': {
+            next_cursor?: string | null
+            has_next_page: boolean
+            items: components['schemas']['crm.meeting'][]
           }
         }
       }

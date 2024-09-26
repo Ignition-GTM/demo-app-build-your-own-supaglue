@@ -190,6 +190,20 @@ export const note = zBaseRecord
   })
   .openapi({ref: 'crm.note'})
 
+export const meeting = zBaseRecord
+  .extend({
+    // Add more fields once we unify more providers
+    deals: z.array(z.object({id: z.string()})).nullish(),
+    // title: z.string().nullish(),
+    // body: z.string().nullish(),
+    // start_time: z.string().nullish(),
+    // end_time: z.string().nullish(),
+    // location: z.string().nullish(),
+    // external_url: z.string().nullish(),
+    // internal_notes: z.string().nullish(),
+  })
+  .openapi({ref: 'crm.meeting'})
+
 // MARK: - Meta
 
 export const meta_object = z

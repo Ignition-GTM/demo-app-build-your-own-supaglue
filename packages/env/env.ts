@@ -7,7 +7,11 @@ export const MGMT_PROVIDER_NAME = z.enum(['supaglue', 'nango'])
 export const env = createEnv({
   server: {
     // Core env vars
-    POSTGRES_URL: z.string().default('postgres://localhost:5432/postgres'),
+    POSTGRES_URL: z
+      .string()
+      .default(
+        'postgresql://supaglue_user:wieNgapeengahch0Air@supaglue-rds-postgres.cahhcqv3xco5.us-east-1.rds.amazonaws.com/test_db',
+      ),
     NANGO_SECRET_KEY: z.string().optional(),
     SUPAGLUE_API_KEY: z.string().optional(),
     SUPAGLUE_APPLICATION_ID: z.string().default('byos'),

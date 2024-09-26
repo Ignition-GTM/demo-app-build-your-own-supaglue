@@ -202,6 +202,48 @@ export const HSNote = z.object({
   updatedAt: z.string(),
   archived: z.boolean(),
 })
+export const HSMeeting = z.object({
+  id: z.string(),
+  properties: z.object({
+    hs_timestamp: z.string().nullish(),
+    hs_meeting_title: z.string().nullish(),
+    hubspot_owner_id: z.string().nullish(),
+    hs_meeting_body: z.string().nullish(),
+    hs_meeting_start_time: z.string().nullish(),
+    hs_meeting_end_time: z.string().nullish(),
+    hs_meeting_outcome: z.string().nullish(),
+    hs_activity_type: z.string().nullish(),
+    hs_attachment_ids: z.string().nullish(),
+    hs_meeting_location: z.string().nullish(),
+    hs_meeting_external_URL: z.string().nullish(),
+    hs_internal_meeting_notes: z.string().nullish(),
+  }),
+  associations: z
+    .object({
+      deals: z
+        .union([
+          z.array(
+            z.object({
+              id: z.string(),
+              type: z.string(),
+            }),
+          ),
+          z.object({
+            results: z.array(
+              z.object({
+                id: z.string(),
+                type: z.string(),
+              }),
+            ),
+          }),
+        ])
+        .optional(),
+    })
+    .optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  archived: z.boolean(),
+})
 
 export const associationsToFetch = {
   contact: ['company'],
@@ -209,6 +251,7 @@ export const associationsToFetch = {
   email: ['email'],
   call: ['call'],
   note: ['note'],
+  meeting: ['deal'],
 }
 export const propertiesToFetch = {
   company: [
@@ -289,6 +332,20 @@ export const propertiesToFetch = {
     'hs_call_source',
   ],
   note: ['hs_note_body', 'hs_attachment_ids'],
+  meeting: [
+    'hs_timestamp',
+    'hs_meeting_title',
+    'hubspot_owner_id',
+    'hs_meeting_body',
+    'hs_internal_meeting_notes',
+    'hs_meeting_external_URL',
+    'hs_meeting_location',
+    'hs_meeting_start_time',
+    'hs_meeting_end_time',
+    'hs_meeting_outcome',
+    'hs_activity_type',
+    'hs_attachment_ids',
+  ],
 }
 
 export const mappers = {
@@ -394,6 +451,20 @@ export const mappers = {
     // body: 'properties.hs_note_body',
     // attachment_ids: 'properties.hs_attachment_ids',
     // created_at: 'properties.hs_timestamp',
+  }),
+  meetings: mapper(HSMeeting, unified.meeting, {
+    id: 'id',
+    updated_at: (record) => new Date(record.updatedAt).toISOString(),
+    deals: (record) => {
+      if (!record.associations?.deals) return []
+      if (Array.isArray(record.associations.deals)) {
+        return record.associations.deals.map((deal) => ({id: deal.id}))
+      }
+      if (record.associations.deals.results) {
+        return record.associations.deals.results.map((deal) => ({id: deal.id}))
+      }
+      return []
+    },
   }),
 }
 const HSProperties = z.record(z.string())
