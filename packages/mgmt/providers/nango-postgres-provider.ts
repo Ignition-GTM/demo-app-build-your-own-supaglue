@@ -169,6 +169,7 @@ export const nangoPostgresProvider = {
           'opportunity',
           'lead',
           'user',
+          'note',
         ].map((object) => ({object})),
       }),
     ),

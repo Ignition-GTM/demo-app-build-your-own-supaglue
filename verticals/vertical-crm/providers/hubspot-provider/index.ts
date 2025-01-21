@@ -102,32 +102,108 @@ const _listObjectsFullThenMap = async <TIn, TOut extends BaseRecord>(
     cursor?: string | null
   },
 ) => {
-  const res =
-    objectType === 'owners'
-      ? await instance[`crm_${objectType as 'owners'}`].GET(
-          `/crm/v3/${objectType as 'owners'}/`,
-          {
-            params: {
-              query: {
-                after: opts?.cursor ?? undefined,
-                limit: opts?.page_size ?? 100,
-              },
+  if (objectType === 'notes') {
+    // Use POST search endpoint for notes to ensure properties are included
+    const res = await instance[`crm_${objectType as 'contacts'}`].POST(
+      `/crm/v3/objects/${objectType as 'contacts'}/search`,
+      {
+        body: {
+          properties: Array.from(
+            new Set([
+              'hs_note_body',
+              'hs_attachment_ids',
+              'hs_createdate',
+              'hs_lastmodifieddate',
+              'hs_object_id',
+              ...(opts?.fields ?? []),
+            ]),
+          ),
+          filterGroups: [],
+          limit: opts?.page_size ?? 100,
+          after: opts?.cursor ?? '',
+          sorts: [
+            {
+              propertyName: 'hs_lastmodifieddate',
+              direction: 'ASCENDING',
             },
+          ] as unknown as string[],
+        },
+      },
+    )
+
+    const batchedAssociations = await Promise.all(
+      (opts.associations ?? []).map(async (associatedType) => {
+        const toObjectIdsByFromObjectId = await _batchListAssociations(
+          instance,
+          {
+            fromObjectIds: res.data.results.map((r) => r.id),
+            fromObjectType: objectType,
+            toObjectType: associatedType,
           },
         )
-      : await instance[`crm_${objectType as 'contacts'}`].GET(
-          `/crm/v3/objects/${objectType as 'contacts'}`,
-          {
-            params: {
-              query: {
-                after: opts?.cursor ?? undefined,
-                limit: opts?.page_size ?? 100,
-                properties: opts?.fields ?? undefined,
-                associations: opts?.associations ?? undefined,
-              },
-            },
+        return [associatedType, toObjectIdsByFromObjectId] as const
+      }),
+    )
+
+    const resultsExtended = res.data.results.map((rawData) => {
+      const associations = Object.fromEntries(
+        batchedAssociations.map(
+          ([associatedType, toObjectIdsByFromObjectId]) => {
+            const toIds = toObjectIdsByFromObjectId[rawData.id] ?? []
+            return [hubspotPluralize(associatedType), {results: toIds}]
           },
-        )
+        ),
+      ) satisfies z.infer<typeof HSAssociations>
+
+      return {
+        ...rawData,
+        // polyfill associations that are not normally available from the search endpoint
+        associations,
+      }
+    })
+
+    return {
+      items: resultsExtended.map(opts.mapper.parse),
+      has_next_page: !!res.data.paging?.next?.after,
+      next_cursor: res.data.paging?.next?.after,
+    }
+  }
+
+  // Handle owners
+  if (objectType === 'owners') {
+    const res = await instance[`crm_${objectType as 'owners'}`].GET(
+      `/crm/v3/${objectType as 'owners'}/`,
+      {
+        params: {
+          query: {
+            after: opts?.cursor ?? undefined,
+            limit: opts?.page_size ?? 100,
+          },
+        },
+      },
+    )
+    return {
+      items: res.data.results.map(opts.mapper.parse),
+      has_next_page: !!res.data.paging?.next?.after,
+      next_cursor: res.data.paging?.next?.after,
+    }
+  }
+
+  // Handle all other object types
+  const res = await instance[`crm_${objectType as 'contacts'}`].GET(
+    `/crm/v3/objects/${objectType as 'contacts'}`,
+    {
+      params: {
+        query: {
+          after: opts?.cursor ?? undefined,
+          limit: opts?.page_size ?? 100,
+          properties: opts?.fields ?? undefined,
+          associations: opts?.associations ?? undefined,
+        },
+      },
+    },
+  )
+
   return {
     items: res.data.results.map(opts.mapper.parse),
     has_next_page: !!res.data.paging?.next?.after,
@@ -152,7 +228,7 @@ const _listObjectsIncrementalThenMap = async <TIn, TOut extends BaseRecord>(
     mapper: {parse: (rawData: unknown) => TOut; _in: TIn}
     page_size?: number
     cursor?: string | null
-    // For caching prupose only really...
+    // For caching purpose only really...
     ctx: {customerId: string}
   },
 ) => {
@@ -160,8 +236,87 @@ const _listObjectsIncrementalThenMap = async <TIn, TOut extends BaseRecord>(
   const cursor = LastUpdatedAtNextOffset.fromCursor(opts?.cursor)
   const kUpdatedAt =
     objectType === 'contacts' ? 'lastmodifieddate' : 'hs_lastmodifieddate'
-  // We may want to consider using the list rather than search endpoint for this stuff...
 
+  // if (objectType === 'notes') {
+  //   // Direct API call for notes
+  //   const response = await fetch(
+  //     `https://api.hubapi.com/crm/v3/objects/notes/search`,
+  //     {
+  //       method: 'POST',
+  //       headers: {
+  //         Authorization: `Bearer CLu-2aDIMhIOAAGAQAAA4AEAAAA4AgEY7I2DCiCS2achKLm_azIUyx41nfPFLAPFx9ZVKufY-KfRQFM6QQAAAEEAAAAAAAAAAAAAAAAEgAAAAAAAAAAAAAAAjvAxAGAAAAAAAAAA_AcGABCgAwAAAAAAAAAAAAAAAAAAAAwEQhQfzv-Y7jqdrNDEwEuhpg9EN0aV1UoDbmExUgBaAGAA`,
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({
+  //         properties: [
+  //           'hs_object_id',
+  //           'hs_note_body',
+  //           'hs_attachment_ids',
+  //           'createdate',
+  //           'hs_lastmodifieddate',
+  //           ...fields,
+  //         ],
+  //         filterGroups: cursor?.last_updated_at
+  //           ? [
+  //               {
+  //                 filters: [
+  //                   {
+  //                     propertyName: 'hs_lastmodifieddate',
+  //                     operator: 'GTE',
+  //                     value: cursor.last_updated_at,
+  //                   },
+  //                 ],
+  //               },
+  //             ]
+  //           : [],
+  //         sorts: [
+  //           {
+  //             propertyName: 'hs_lastmodifieddate',
+  //             direction: 'ASCENDING',
+  //           },
+  //         ],
+  //         limit,
+  //         after: cursor?.next_offset ?? '',
+  //         associations: opts.associations || [
+  //           'contacts',
+  //           'deals',
+  //           'companies',
+  //           'calls',
+  //           'emails',
+  //         ],
+  //       }),
+  //     },
+  //   )
+
+  //   if (!response.ok) {
+  //     throw new Error(
+  //       `HubSpot API request failed with status: ${response.status}`,
+  //     )
+  //   }
+
+  //   const res = await response.json()
+
+  //   // Map the results using the provided mapper
+  //   const items = res.results.map(opts.mapper.parse)
+  //   const lastItem = items[items.length - 1]
+
+  //   return {
+  //     items,
+  //     has_next_page: !!res.paging?.next?.after,
+  //     next_cursor:
+  //       (lastItem
+  //         ? LastUpdatedAtNextOffset.toCursor({
+  //             last_updated_at: lastItem.updated_at,
+  //             next_offset:
+  //               lastItem.updated_at === cursor?.last_updated_at
+  //                 ? res.paging?.next?.after
+  //                 : undefined,
+  //           })
+  //         : opts?.cursor) ?? null,
+  //   }
+  // }
+
+  // Original code for other object types
   const res = await instance[`crm_${objectType as 'contacts'}`].POST(
     `/crm/v3/objects/${objectType as 'contacts'}/search`,
     {
@@ -201,11 +356,6 @@ const _listObjectsIncrementalThenMap = async <TIn, TOut extends BaseRecord>(
             propertyName: kUpdatedAt,
             direction: 'ASCENDING',
           },
-          // Cannot sort by multiple values unfortunately...
-          // {
-          //   propertyName: 'hs_object_id',
-          //   direction: 'ASCENDING',
-          // },
         ] as unknown as string[],
         limit,
       },
@@ -222,7 +372,7 @@ const _listObjectsIncrementalThenMap = async <TIn, TOut extends BaseRecord>(
       return [associatedType, toObjectIdsByFromObjectId] as const
     }),
   )
-  // console.log('associations:', batchedAssociations)
+
   const pipelineStageMapping =
     objectType === 'deals'
       ? await cachedGetPipelineStageMapping(instance, opts.ctx)
@@ -248,6 +398,7 @@ const _listObjectsIncrementalThenMap = async <TIn, TOut extends BaseRecord>(
 
   const items = resultsExtended.map(opts.mapper.parse)
   const lastItem = items[items.length - 1]
+
   return {
     items,
     // Not the same as simply items.length === 0
@@ -497,13 +648,66 @@ const _batchReadObjectThenMap = async <TIn, TOut extends BaseRecord>(
 }
 
 export const hubspotProvider = {
-  __init__: async ({proxyLinks, getCredentials}) =>
-    initHubspotSDK({
+  __init__: async ({proxyLinks, getCredentials}) => {
+    const credentials = await getCredentials()
+    const sdk = initHubspotSDK({
       headers: {
-        authorization: `Bearer ${(await getCredentials()).access_token}`,
-      }, // This will be populated by Nango, or you can populate your own...
+        authorization: `Bearer ${credentials.access_token}`,
+      },
       links: (defaultLinks) => [...proxyLinks, ...defaultLinks],
-    }),
+    })
+
+    // Return the SDK with added CRM methods
+    return {
+      ...sdk,
+      crm_notes: {
+        GET: async (path: string) => {
+          const response = await fetch(`https://api.hubapi.com${path}`, {
+            headers: {
+              Authorization: `Bearer ${credentials.access_token}`,
+            },
+          })
+
+          if (!response.ok) {
+            throw new Error(
+              `HubSpot API request failed with status: ${response.status}`,
+            )
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const data = await response.json()
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          return {data}
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        POST: async (path: string, options: any) => {
+          const response = await fetch(`https://api.hubapi.com${path}`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${credentials.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            body: JSON.stringify(options?.body),
+          })
+
+          if (!response.ok) {
+            throw new Error(
+              `HubSpot API request failed with status: ${response.status}`,
+            )
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const data = await response.json()
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          return {data}
+        },
+      },
+      crm_contacts: sdk.crm_contacts,
+      crm_companies: sdk.crm_companies,
+      // ... other existing CRM objects
+    }
+  },
   listContacts: async ({instance, input, ctx}) =>
     input?.sync_mode === 'full'
       ? _listObjectsFullThenMap(instance, {
@@ -643,8 +847,9 @@ export const hubspotProvider = {
           ctx,
         }),
 
-  listNotes: async ({instance, input, ctx}) =>
-    input?.sync_mode === 'full'
+  listNotes: async ({instance, input, ctx}) => {
+    console.log('input', input)
+    return input?.sync_mode === 'full'
       ? _listObjectsFullThenMap(instance, {
           objectType: 'notes',
           mapper: mappers.notes,
@@ -661,7 +866,8 @@ export const hubspotProvider = {
           includeAllFields: true,
           associations: associationsToFetch.note,
           ctx,
-        }),
+        })
+  },
 
   // MARK: - Custom objects
   listCustomObjectRecords: async ({instance, input}) =>

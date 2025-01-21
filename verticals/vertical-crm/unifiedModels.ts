@@ -182,10 +182,13 @@ export const call = zBaseRecord
 
 export const note = zBaseRecord
   .extend({
+    // body: z.string().nullish(),
     // Add more fields once we unify more providers
-    body: z.string().nullish(),
     // attachment_ids: z.string().nullish(),
     // created_at: z.string().nullish(),
+    // last_modified_at: z.string().nullish(),
+    // created_at: z.string().nullish(),
+    // is_deleted: z.boolean().nullish(),
     // last_modified_at: z.string().nullish(),
   })
   .openapi({ref: 'crm.note'})

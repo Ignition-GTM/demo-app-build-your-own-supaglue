@@ -192,10 +192,10 @@ export const HSCall = z.object({
 export const HSNote = z.object({
   id: z.string(),
   properties: z.object({
-    hs_timestamp: z.string().nullish(),
+    // hs_timestamp: z.string().nullish(),
     hs_note_body: z.string().nullish(),
-    hubspot_owner_id: z.string().nullish(),
-    hs_attachment_ids: z.string().nullish(),
+    // hubspot_owner_id: z.string().nullish(),
+    // hs_attachment_ids: z.string().nullish(),
   }),
   associations: HSAssociations.nullish(),
   createdAt: z.string(),
@@ -208,7 +208,7 @@ export const associationsToFetch = {
   deal: ['company'],
   email: ['email'],
   call: ['call'],
-  note: ['note'],
+  note: ['company'],
 }
 export const propertiesToFetch = {
   company: [
@@ -390,10 +390,9 @@ export const mappers = {
   }),
   notes: mapper(HSNote, unified.note, {
     id: 'id',
-    updated_at: (record) => new Date(record.updatedAt).toISOString(),
+    // body: (record) => record.properties.hs_note_body, // Changed to a function to match expected type
     // body: 'properties.hs_note_body',
-    // attachment_ids: 'properties.hs_attachment_ids',
-    // created_at: 'properties.hs_timestamp',
+    updated_at: (record) => new Date(record.updatedAt).toISOString(),
   }),
 }
 const HSProperties = z.record(z.string())

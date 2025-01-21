@@ -66,7 +66,7 @@ switch (cmd) {
             vertical: env['VERTICAL']! as 'crm',
             unified_objects: env['UNIFIED_OBJECT']
               ? [env['UNIFIED_OBJECT']]
-              : ['account', 'contact', 'opportunity', 'lead', 'user'],
+              : ['account', 'contact', 'opportunity', 'lead', 'user', 'note'],
             custom_objects: env['CUSTOM_OBJECT']
               ? [env['CUSTOM_OBJECT']]
               : undefined,
