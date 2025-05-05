@@ -11,7 +11,7 @@ import * as functions from './functions'
 export const inngestFunctions = [
   inngest.createFunction(
     {id: 'Request scheduling hourly incremental syncs'},
-    {cron: '0 * * * *'}, // Once an hour on the hour by default
+    {cron: '0 */6 * * *'}, // Every 6 hours (at 00:00, 06:00, 12:00, 18:00 UTC)
     ({step}) =>
       step.sendEvent('scheduler.requested', {
         name: 'scheduler.requested',
