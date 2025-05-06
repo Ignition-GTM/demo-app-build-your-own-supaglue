@@ -56,30 +56,43 @@ export async function scheduleSyncs({
     byos.GET('/customers').then((r) => r.data),
   ])
 
-  // Helper function to add delay between requests
-  const delay = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms))
-
-  // Sequential fetching with delay instead of parallel
-  const connections = []
-  for (const c of customers) {
+  // Helper function to fetch with retry and delay
+  const fetchWithRetry = async (customerId: string, attempt = 1) => {
     try {
       const response = await byos.GET('/customers/{customer_id}/connections', {
-        params: {path: {customer_id: c.customer_id}},
+        params: {path: {customer_id: customerId}},
       })
-      connections.push(...response.data)
-      // Add 1 second delay between requests
-      await delay(10000)
-    } catch (error) {
+      return response.data
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        const retryAfter = parseInt(
+          error.response?.headers?.['retry-after'] || '60',
+          10,
+        )
+        console.log(
+          `Rate limited for customer ${customerId}. Waiting ${retryAfter} seconds... (attempt ${attempt})`,
+        )
+        await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000))
+        return fetchWithRetry(customerId, attempt + 1)
+      }
       console.error(
-        `Error fetching connections for customer ${c.customer_id}:`,
+        `Error fetching connections for customer ${customerId}:`,
         error,
       )
-      // Continue with next customer even if one fails
+      return []
     }
   }
 
-  const events = connections
+  // Fetch connections with delay between requests
+  const allConnections = await Promise.all(
+    customers.map(async (c, index) => {
+      // Add delay between requests (1 second between each)
+      await new Promise((resolve) => setTimeout(resolve, index * 1000))
+      return fetchWithRetry(c.customer_id)
+    }),
+  ).then((nestedArr) => nestedArr.flat())
+
+  const events = allConnections
     .map((c) => {
       if (!event.data.provider_names.includes(c.provider_name)) {
         // Only sync these for now...
@@ -92,7 +105,7 @@ export async function scheduleSyncs({
         (sc) => sc.provider_name === c.provider_name,
       )
       return {
-        name: 'sync.requested',
+        name: 'sync.requested' as const,
         data: {
           customer_id: c.customer_id,
           provider_name: c.provider_name,
@@ -109,17 +122,21 @@ export async function scheduleSyncs({
           destination_schema: env.DESTINATION_SCHEMA,
           sync_mode: event.data.sync_mode,
         },
-      } satisfies EventPayload
+      }
     })
     .filter((c): c is NonNullable<typeof c> => !!c)
 
   console.log('[scheduleSyncs] Metrics', {
     num_customers: customers.length,
-    num_connections: connections.length,
+    num_connections: allConnections.length,
     num_connections_to_sync: events.length,
   })
 
-  await step.sendEvent('emit-connection-sync-events', events)
+  // Send each sync.requested event individually
+  for (const evt of events) {
+    await step.sendEvent('sync.requested', evt)
+  }
+
   // make it easier to see...
   return events.map((e) => ({
     customer_id: e.data.customer_id,
@@ -165,20 +182,19 @@ export async function syncConnection({
         eq(schema.sync_state.provider_name, provider_name),
       ),
     })
-    .then(async (ss) => {
-      if (ss) return ss
-      const rows = await db
-        .insert(schema.sync_state)
-        .values({
-          customer_id,
-          provider_name,
-          state: sql`${{}}::jsonb`,
-        })
-        .returning()
-      const row = rows[0]
-      if (!row) throw new Error('Failed to create sync state')
-      return row
-    })
+    .then(
+      (ss) =>
+        ss ??
+        db
+          .insert(schema.sync_state)
+          .values({
+            customer_id,
+            provider_name,
+            state: sql`${{}}::jsonb`,
+          })
+          .returning()
+          .then((rows) => rows[0]!),
+    )
 
   const syncRunId = await db
     .insert(schema.sync_run)
@@ -188,11 +204,7 @@ export async function syncConnection({
       started_at: sqlNow,
     })
     .returning()
-    .then((rows) => {
-      const row = rows[0]
-      if (!row) throw new Error('Failed to create sync run')
-      return row.id
-    })
+    .then((rows) => rows[0]!.id)
 
   const byos = initByosSDK({
     headers: {
@@ -219,11 +231,11 @@ export async function syncConnection({
   function incrementMetric(name: string, amount = 1) {
     const metric = metrics[name]
     metrics[name] = (typeof metric === 'number' ? metric : 0) + amount
-    return metrics[name]
+    return metrics[name] as number
   }
   function setMetric<T extends string | number>(name: string, value: T) {
     metrics[name] = value
-    return metrics[name]
+    return metrics[name] as T
   }
   const streams = [
     ...unified_objects.map((o) => ({name: o, type: 'unified' as const})),
