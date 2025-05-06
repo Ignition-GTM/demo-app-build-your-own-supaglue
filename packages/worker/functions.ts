@@ -35,6 +35,18 @@ export type FunctionInput<T extends keyof Events> = {
 type SingleNoArray<T> = T extends Array<infer U> ? U : T
 export type EventPayload = SingleNoArray<SendEventPayload<Events>>
 
+type Connection = {
+  id: string
+  customer_id: string
+  provider_name: string
+  sync_config?: {
+    destination_config?: {type: string; schema?: string | null} | null
+    unified_objects?: Array<{object: string}> | null
+    standard_objects?: Array<{object: string}> | null
+    custom_objects?: Array<{object: string}> | null
+  } | null
+}
+
 export async function scheduleSyncs({
   step,
   event,
@@ -57,7 +69,10 @@ export async function scheduleSyncs({
   ])
 
   // Helper function to fetch with retry and delay
-  const fetchWithRetry = async (customerId: string, attempt = 1) => {
+  const fetchWithRetry = async (
+    customerId: string,
+    attempt = 1,
+  ): Promise<Connection[]> => {
     try {
       const response = await byos.GET('/customers/{customer_id}/connections', {
         params: {path: {customer_id: customerId}},
