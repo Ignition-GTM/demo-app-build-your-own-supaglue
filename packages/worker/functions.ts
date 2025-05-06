@@ -68,46 +68,17 @@ export async function scheduleSyncs({
     byos.GET('/customers').then((r) => r.data),
   ])
 
-  // Helper function to fetch with retry and delay
-  const fetchWithRetry = async (
-    customerId: string,
-    attempt = 1,
-  ): Promise<Connection[]> => {
-    try {
-      const response = await byos.GET('/customers/{customer_id}/connections', {
-        params: {path: {customer_id: customerId}},
-      })
-      return response.data
-    } catch (error: any) {
-      if (error.response?.status === 429) {
-        const retryAfter = parseInt(
-          error.response?.headers?.['retry-after'] || '60',
-          10,
-        )
-        console.log(
-          `Rate limited for customer ${customerId}. Waiting ${retryAfter} seconds... (attempt ${attempt})`,
-        )
-        await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000))
-        return fetchWithRetry(customerId, attempt + 1)
-      }
-      console.error(
-        `Error fetching connections for customer ${customerId}:`,
-        error,
-      )
-      return []
-    }
-  }
-
-  // Fetch connections with delay between requests
-  const allConnections = await Promise.all(
-    customers.map(async (c, index) => {
-      // Add delay between requests (1 second between each)
-      await new Promise((resolve) => setTimeout(resolve, index * 1000))
-      return fetchWithRetry(c.customer_id)
-    }),
+  const connections = await Promise.all(
+    customers.map((c) =>
+      byos
+        .GET('/customers/{customer_id}/connections', {
+          params: {path: {customer_id: c.customer_id}},
+        })
+        .then((r) => r.data),
+    ),
   ).then((nestedArr) => nestedArr.flat())
 
-  const events = allConnections
+  const events = connections
     .map((c) => {
       if (!event.data.provider_names.includes(c.provider_name)) {
         // Only sync these for now...
@@ -143,7 +114,7 @@ export async function scheduleSyncs({
 
   console.log('[scheduleSyncs] Metrics', {
     num_customers: customers.length,
-    num_connections: allConnections.length,
+    num_connections: connections.length,
     num_connections_to_sync: events.length,
   })
 
